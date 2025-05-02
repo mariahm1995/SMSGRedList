@@ -117,7 +117,7 @@ exportSpatialobject <- function(previous_map, new_map, currentyear){
 
   final_map <- st_as_sf(final_map)
 
-  dir_path <- paste0("species/", spname, "/final_map")
+  dir_path <- paste0("species/", spname, "/", spname, "_final_map")
   if (!dir.exists(dir_path)) {
     dir.create(dir_path, recursive = TRUE)
     message("The folder has been created.")
@@ -125,7 +125,7 @@ exportSpatialobject <- function(previous_map, new_map, currentyear){
     message("The folder already exists.")
   }
 
-  st_write(final_map, paste0(dir_path, "/final_map.shp"), append = FALSE)
+  st_write(final_map, paste0(dir_path, "/", spname, "_final_map.shp"), append = FALSE)
   return(final_map$geometry)
 }
 

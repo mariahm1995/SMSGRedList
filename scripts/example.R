@@ -32,7 +32,7 @@ library(red)
 library(devtools)
 
 # Install the SMSGRedList package from GitHub
-devtools::install_github("mariahm1995/SMSGRedList")
+devtools::install_github("mariahm1995/SMSGRedList", force = TRUE)
 library(SMSGRedList)
 
 # If using within a package, you can skip this and use the package namespace
@@ -41,19 +41,11 @@ library(SMSGRedList)
 # ========================
 # Configuration
 # ========================
-zip_url <- "https://ndownloader.figshare.com/files/12345678"  # Replace with your actual Figshare file download link
-zip_file <- "data.zip"
-data_dir <- "data"
-
-if (!dir.exists(data_dir)) {
-  message("Data folder not found. Downloading from Figshare...")
-  download.file(zip_url, destfile = zip_file, mode = "wb")
-  unzip(zip_file)
-  unlink(zip_file)
-  message("Done! 'data/' folder is now available.")
-} else {
-  message("Data folder already exists. Skipping download.")
-}
+# Download the files needed for the assessment (only one time)
+options(timeout = 600)
+download.file("https://ndownloader.figshare.com/files/54137138", destfile = "data.zip", mode = "wb")
+unzip("data.zip")
+unlink("data.zip")
 
 # ========================
 # Species selection
@@ -116,8 +108,10 @@ occs_filter <- occs_cleaned %>% filter(is.na(Reason))
 # ========================
 ggplot() +
   geom_sf(data = previous_map) +
-  geom_point(data = occs_cleaned, aes(decimalLongitude, decimalLatitude, color = "blue")) +
-  geom_point(data = occs_filter, aes(decimalLongitude, decimalLatitude, color = "red"))
+  geom_point(data = occs_cleaned,
+             aes(decimalLongitude, decimalLatitude, color = "blue")) +
+  geom_point(data = occs_filter,
+             aes(decimalLongitude, decimalLatitude, color = "red"))
 
 # ========================
 # Map generation from occurrences
@@ -149,7 +143,7 @@ processed_maps <- checkMap(
 )
 
 # ========================
-# Manual editing (optional)
+# Manual editing (if needed)
 # ========================
 new_area <- manualEdition(
   modification_type = "add",
