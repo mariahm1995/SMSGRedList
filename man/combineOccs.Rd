@@ -4,14 +4,14 @@
 \alias{combineOccs}
 \title{Combine GBIF and literature-based occurrences}
 \usage{
-combineOccs(occsGBIF, occsLit, combine = TRUE)
+combineOccs(occsGBIF = NULL, occsLit = NULL, combine = TRUE)
 }
 \arguments{
-\item{occsGBIF}{A data frame of GBIF records.}
+\item{occsGBIF}{A data frame of GBIF records, or NULL.}
 
-\item{occsLit}{A data frame of literature-sourced records.}
+\item{occsLit}{A data frame of literature-sourced records, or NULL.}
 
-\item{combine}{Logical. If TRUE (default), merges both datasets. If FALSE, only GBIF is used.}
+\item{combine}{Logical. If TRUE (default), merges both datasets. If FALSE, only one source (non-NULL) is used.}
 }
 \value{
 A unified occurrence data frame with harmonized columns.
