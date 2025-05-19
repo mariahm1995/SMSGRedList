@@ -84,7 +84,7 @@ occsLit <- read.csv(paste0("species/", spname, "/lit_", spname, "_Occurrences.cs
 # ========================
 # Combine and clean occurrences
 # ========================
-occs <- combineOccs(occsGBIF = occsGBIF, occsLit = occsLit, combine = TRUE)
+occs <- combineOccs(occsGBIF = occsGBIF, occsLit = occsLit, combine = FALSE)
 occs <- extractElevation(occs = occs)
 
 occs_cleaned <- sRL_cleanDataGBIF(

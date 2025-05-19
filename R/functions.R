@@ -46,21 +46,36 @@ convert_to_decimal <- function(data) {
 #'
 #' Merges occurrence datasets, ensuring column consistency and optional source control.
 #'
-#' @param occsGBIF A data frame of GBIF records.
-#' @param occsLit A data frame of literature-sourced records.
-#' @param combine Logical. If TRUE (default), merges both datasets. If FALSE, only GBIF is used.
+#' @param occsGBIF A data frame of GBIF records, or NULL.
+#' @param occsLit A data frame of literature-sourced records, or NULL.
+#' @param combine Logical. If TRUE (default), merges both datasets. If FALSE, only one source (non-NULL) is used.
 #' @return A unified occurrence data frame with harmonized columns.
 #' @export
-combineOccs <- function(occsGBIF, occsLit, combine = TRUE){
+combineOccs <- function(occsGBIF = NULL, occsLit = NULL, combine = TRUE) {
   if (!combine) {
-    occs <- occsGBIF
-    occs$Link <- NA
-  } else {
-    occsLit[setdiff(names(occsGBIF), names(occsLit))] <- NA
-    occsGBIF[setdiff(names(occsLit), names(occsGBIF))] <- NA
-    occs <- rbind(occsLit, occsGBIF)
+    # Determine which dataset to return
+    if (!is.null(occsGBIF) && is.null(occsLit)) {
+      occs <- occsGBIF
+    } else if (is.null(occsGBIF) && !is.null(occsLit)) {
+      occs <- occsLit
+    } else {
+      stop("When combine = FALSE, provide exactly one of occsGBIF or occsLit.")
+    }
+    if (!"Link" %in% names(occs)) occs$Link <- NA
+    return(occs)
   }
-  if (!"Link" %in% colnames(occs)) occs$Link <- NA
+
+  # If combine = TRUE
+  if (is.null(occsGBIF) || is.null(occsLit)) {
+    stop("When combine = TRUE, both occsGBIF and occsLit must be provided.")
+  }
+
+  # Harmonize columns
+  occsLit[setdiff(names(occsGBIF), names(occsLit))] <- NA
+  occsGBIF[setdiff(names(occsLit), names(occsGBIF))] <- NA
+  occs <- rbind(occsLit, occsGBIF)
+
+  if (!"Link" %in% names(occs)) occs$Link <- NA
   return(occs)
 }
 
