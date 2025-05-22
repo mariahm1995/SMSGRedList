@@ -161,7 +161,7 @@ final_map <- exportSpatialobject(
   currentyear = 2025
 )
 
-final_map <- st_read(paste0("species/", spname, "/final_map/final_map.shp"))
+final_map <- st_read(paste0("species/", spname, "/", spname,"_final_map/" , spname, "_final_map.shp"))
 
 # ========================
 # Create interactive map

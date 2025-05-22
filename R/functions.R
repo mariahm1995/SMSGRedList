@@ -509,6 +509,8 @@ sRL_LeafletFlags <- function(flags, previous_map, final_map, elevation_map,
   occs_proj <- st_transform(occs_filter_spatial, crs(grid22))
   grid_crop <- crop(grid22, (extent(occs_proj) + c(-100000, 100000, -100000, 100000)), snap = "out")
 
+  flags <- flags[order(flags$Source_type, decreasing = F), ]
+
   pts <- occs_proj %>% as_Spatial() %>% as('SpatialPoints')
   AOO_pts <- terra::rasterize(pts, grid_crop, fun = 'count') >= 1
   aooValue <- sum(as.vector(AOO_pts), na.rm = TRUE) * 4
@@ -546,8 +548,7 @@ sRL_LeafletFlags <- function(flags, previous_map, final_map, elevation_map,
       stroke = FALSE,
       popup = flags$PopText,
       radius = 8,
-      group = "Occurrence records"
-    ) %>%
+      group = "Occurrence records") %>%
     addLegend(position = "bottomleft", colors = c('#fdcb25ff', '#440154ff'),
               labels = c("Valid", "Not valid")) %>%
     addLayersControl(baseGroups = c("OpenStreetMap", "Satellite", "Topography"),
