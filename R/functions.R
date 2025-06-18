@@ -163,16 +163,22 @@ checkMap <- function(map, method, smoothness = NULL, smooth, elevation_range,
                      AltMIN, AltMAX, keep = .05, continental) {
 
   elevation <- raster::raster("data/geodata/rasters/DEM_globe_raster/dem_globe1.tif")
-  land_full <- st_read("data/geodata/polygons/Land_Masses_and_Ocean_Islands/") %>%
+  land_full <- st_read("data/geodata/polygons/Countries/G2013_2012_0.shp") %>%
     st_make_valid()
 
   if (continental == TRUE){
     land_full <- land_full %>% slice(1:7)
   }
 
-  sf::sf_use_s2(FALSE)
-  land <- st_crop(land_full, st_bbox(map) + c(-2, -2, 2, 2)) %>% st_union()
-  sf::sf_use_s2(TRUE)
+  # sf::sf_use_s2(FALSE)
+
+  st_crs(map) <- 54009
+  land_proj <- st_transform(land_full, st_crs(map))
+  land <- st_crop(land_proj, st_bbox(map) + c(-200000, -200000, 200000, 200000)) %>%
+    st_union()
+  land <- st_transform(land, 4326)
+
+  # sf::sf_use_s2(TRUE)
 
   if (smooth == TRUE) {
     if (method == "ksmooth") {
@@ -246,7 +252,7 @@ manualEdition <- function(modification_type, maps, previous_map, occs){
     new <- st_sf(geometry = modification$drawn$geometry)
   }
 
-  land <- st_read("data/geodata/polygons/Land_Masses_and_Ocean_Islands/") %>% st_make_valid()
+  land <- st_read("data/geodata/polygons/Countries/G2013_2012_0.shp") %>% st_make_valid()
   map_smoothed <- smoothr::smooth(new, method = "ksmooth", smoothness = 0.5)
   new_cropped <- st_intersection(map_smoothed, land)
 
@@ -457,6 +463,13 @@ sRL_MapDistributionGBIF <- function(dat, First_step, Buffer_km, GBIF_crop, Gbif_
   CRSMOLL <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
   realms_mcp <- st_union(realms_raw) %>% st_as_sf() %>% st_transform(CRSMOLL) %>% st_convex_hull() %>% st_buffer(1000)
 
+
+  # -------------------------------------------------------------------
+  # 2. Re-project the GBIF occurrences --------------------------------
+  # -------------------------------------------------------------------
+  orig_crs <- st_crs(dat)            # remember original CRS
+  dat_proj <- st_transform(dat, CRSMOLL)
+
   if (First_step == "mcp" || First_step == "") {
     distGBIF <- st_as_sf(st_convex_hull(st_union(dat)))
     st_geometry(distGBIF) <- "geometry"
@@ -465,7 +478,8 @@ sRL_MapDistributionGBIF <- function(dat, First_step, Buffer_km, GBIF_crop, Gbif_
   if (First_step == "kernel") {
     dat_subsample <- distinct(dat, as.character(geometry), .keep_all = TRUE)
     kernel.ref <- adehabitatHR::kernelUD(as_Spatial(dat), h = "href")
-    distGBIF <- adehabitatHR::getverticeshr(kernel.ref, percent = 100 * Gbif_Param) %>% st_as_sf()
+    distGBIF <- adehabitatHR::getverticeshr(kernel.ref, percent = 100 * Gbif_Param) %>%
+      st_as_sf()
   }
 
   if (First_step == "alpha") {
@@ -486,6 +500,7 @@ sRL_MapDistributionGBIF <- function(dat, First_step, Buffer_km, GBIF_crop, Gbif_
   }
 
   distGBIF <- st_buffer(distGBIF, Buffer_km * 1000) %>% st_as_sf()
+  distGBIF <- st_transform(distGBIF, orig_crs)
   return(distGBIF)
 }
 
