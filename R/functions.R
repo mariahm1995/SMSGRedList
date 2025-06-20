@@ -6,7 +6,7 @@
 #' @return A character vector of country names that intersect the input map.
 #' @export
 countries_intersection <- function(map){
-  countries_pol <- st_read("data/geodata/polygons/Countries/") %>% st_make_valid()
+  countries_pol <- st_read("data/geodata/sRedList/Red_List_countries_msSimplif0.05_MOLL.shp") %>% st_make_valid()
   map <- st_make_valid(map)
   overlap_countries <- st_intersection(countries_pol, map)
   countries_list <- overlap_countries$ADM0_NAME
@@ -163,8 +163,7 @@ checkMap <- function(map, method, smoothness = NULL, smooth, elevation_range,
                      AltMIN, AltMAX, keep = .05, continental) {
 
   elevation <- raster::raster("data/geodata/rasters/DEM_globe_raster/dem_globe1.tif")
-  land_full <- st_read("data/geodata/polygons/Countries/G2013_2012_0.shp") %>%
-    st_make_valid()
+  land_full <- st_read("data/geodata/sRedList/Red_List_countries_msSimplif0.05_MOLL.shp") %>% st_make_valid()
 
   if (continental == TRUE){
     land_full <- land_full %>% slice(1:7)
@@ -172,7 +171,10 @@ checkMap <- function(map, method, smoothness = NULL, smooth, elevation_range,
 
   # sf::sf_use_s2(FALSE)
 
-  st_crs(map) <- 54009
+  if (is.na(st_crs(map))) {
+    st_crs(map) <- st_crs("ESRI:54009")   # or use the +proj string as above
+  }
+
   land_proj <- st_transform(land_full, st_crs(map))
   land <- st_crop(land_proj, st_bbox(map) + c(-200000, -200000, 200000, 200000)) %>%
     st_union()
@@ -183,14 +185,15 @@ checkMap <- function(map, method, smoothness = NULL, smooth, elevation_range,
   if (smooth == TRUE) {
     if (method == "ksmooth") {
       map_smoothed <- smoothr::smooth(map, method = method, smoothness = smoothness)
-      new <- st_intersection(st_as_sf(map_smoothed), land)
+      new <- st_intersection(st_as_sf(map) %>% st_transform(4326), land)
     }
     if (method %in% c("chaikin", "spline")) {
-      map_smoothed <- smoothr::smooth(map, method = method)
-      new <- st_intersection(st_as_sf(map_smoothed), land)
+      map_smoothed <- smoothr::smooth(map, method = method, smoothness = smoothness)
+      map_smoothed_sf <- st_as_sf(map_smoothed) %>% st_transform(4326)
+      new <- st_intersection(map_smoothed_sf, land)
     }
   } else {
-    new <- st_intersection(st_as_sf(map), land)
+    new <- st_intersection(st_as_sf(map) %>% st_transform(4326), land)
   }
 
   if (elevation_range == TRUE){
@@ -237,12 +240,34 @@ manualEdition <- function(modification_type, maps, previous_map, occs){
   map1$geometry <- st_make_valid(st_union(maps[[1]]))
 
   elevation_map <- previous_map
-  elevation_map$geometry <- st_make_valid(st_union(maps[[2]]))
+  if (!is.null(maps[[2]])) {
+    elevation_map$geometry <- st_make_valid(st_union(maps[[2]]))
+  } else {
+    elevation_map <- NULL
+  }
+  maps_all <- list(
+    new_range     = map1,
+    previous_map  = previous_map
+  )
 
-  maps_all <- list(map1, elevation_map, previous_map)
-  names(maps_all) <- c("new_range", "elevation_limits", "previous_map")
+  if (!is.null(elevation_map)) {
+    maps_all$elevation_limits <- elevation_map
+  }
 
-  modification <- (mapview(maps_all, col.regions = c("#335c67", "#e09f3e", "#9e2a2b")) + mapview(occs)) %>% editMap()
+  # Set custom colors depending on how many layers are present
+  layer_colors <- c("#335c67", "#9e2a2b")  # without elevation
+  if (!is.null(elevation_map)) {
+    layer_colors <- c("#335c67", "#e09f3e", "#9e2a2b")  # with elevation
+  }
+
+  # Visualize and enter edit mode
+  modification <- (mapview(maps_all, col.regions = layer_colors) + mapview(occs)) %>%
+    editMap()
+
+  # maps_all <- list(map1, elevation_map, previous_map)
+  # names(maps_all) <- c("new_range", "elevation_limits", "previous_map")
+  #
+  # modification <- (mapview(maps_all, col.regions = c("#335c67", "#e09f3e", "#9e2a2b")) + mapview(occs)) %>% editMap()
 
   if (modification_type == "add") {
     new <- st_union(modification$drawn$geometry, previous_map$geometry)
@@ -252,7 +277,8 @@ manualEdition <- function(modification_type, maps, previous_map, occs){
     new <- st_sf(geometry = modification$drawn$geometry)
   }
 
-  land <- st_read("data/geodata/polygons/Countries/G2013_2012_0.shp") %>% st_make_valid()
+  land <- st_read("data/geodata/sRedList/Red_List_countries_msSimplif0.05_MOLL.shp") %>% st_make_valid()
+  land <- st_transform(land, st_crs(previous_map))
   map_smoothed <- smoothr::smooth(new, method = "ksmooth", smoothness = 0.5)
   new_cropped <- st_intersection(map_smoothed, land)
 
@@ -356,7 +382,9 @@ sRL_SimpleGBIF <- function(co_EXT){
 sRL_cleanDataGBIF <- function(flags, year_GBIF, uncertainty_GBIF, GBIF_xmin, GBIF_xmax,
                               GBIF_ymin, GBIF_ymax, AltMIN, AltMAX, land) {
 
-  sea_GBIF <- st_read("data/geodata/polygons/Countries/")
+  sea_GBIF <- st_read("data/geodata/polygons/Countries/") %>% st_make_valid()
+  # CRSMOLL<-"+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
+  # st_crs(sea_GBIF) <- CRSMOLL
   occstemp <- st_as_sf(flags[c("decimalLongitude", "decimalLatitude")],
                        coords = c("decimalLongitude", "decimalLatitude"), crs = crs(sea_GBIF))
 
@@ -458,11 +486,11 @@ sRL_PopRecords <- function(flags){
 #' @return An `sf` object of the resulting buffered and cropped species range.
 #' @export
 sRL_MapDistributionGBIF <- function(dat, First_step, Buffer_km, GBIF_crop, Gbif_Param) {
-  distCountries_mapping <- st_read("data/geodata/sRedList/Red_List_countries_msSimplif0.05_MOLL.shp")
+  # distCountries_mapping <- st_read("data/geodata/sRedList/Red_List_countries_msSimplif0.05_MOLL.shp")
+  distCountries_mapping <- st_read("data/geodata/sRedList/Red_List_countries_msSimplif0.05_MOLL.shp") %>% st_make_valid()
   realms_raw <- st_read("data/geodata/sRedList/RL_Realms.shp")
   CRSMOLL <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
   realms_mcp <- st_union(realms_raw) %>% st_as_sf() %>% st_transform(CRSMOLL) %>% st_convex_hull() %>% st_buffer(1000)
-
 
   # -------------------------------------------------------------------
   # 2. Re-project the GBIF occurrences --------------------------------
@@ -471,22 +499,22 @@ sRL_MapDistributionGBIF <- function(dat, First_step, Buffer_km, GBIF_crop, Gbif_
   dat_proj <- st_transform(dat, CRSMOLL)
 
   if (First_step == "mcp" || First_step == "") {
-    distGBIF <- st_as_sf(st_convex_hull(st_union(dat)))
+    distGBIF <- st_as_sf(st_convex_hull(st_union(dat_proj)))
     st_geometry(distGBIF) <- "geometry"
   }
 
   if (First_step == "kernel") {
-    dat_subsample <- distinct(dat, as.character(geometry), .keep_all = TRUE)
-    kernel.ref <- adehabitatHR::kernelUD(as_Spatial(dat), h = "href")
+    dat_subsample <- distinct(dat_proj, as.character(geometry), .keep_all = TRUE)
+    kernel.ref <- adehabitatHR::kernelUD(as_Spatial(dat_proj), h = "href")
     distGBIF <- adehabitatHR::getverticeshr(kernel.ref, percent = 100 * Gbif_Param) %>%
       st_as_sf()
   }
 
   if (First_step == "alpha") {
-    Round_Fact <- ifelse(as.numeric(max(st_distance(dat))) < 10000, -1, -2)
-    Coords_simplif <- st_coordinates(dat) %>% round(digits = Round_Fact)
+    Round_Fact <- ifelse(as.numeric(max(st_distance(dat_proj))) < 10000, -1, -2)
+    Coords_simplif <- st_coordinates(dat_proj) %>% round(digits = Round_Fact)
     dat$Coord_simplif <- paste(Coords_simplif[, 1], Coords_simplif[, 2], sep = ":")
-    dat_subsample <- distinct(dat, Coord_simplif, .keep_all = TRUE)
+    dat_subsample <- distinct(dat_proj, Coord_simplif, .keep_all = TRUE)
 
     EX <- raster::extent(dat_subsample)
     Alpha_scaled <- (0.5 * Gbif_Param)^2 * sqrt((EX@xmin - EX@xmax)^2 + (EX@ymin - EX@ymax)^2) %>% as.numeric()
@@ -496,11 +524,10 @@ sRL_MapDistributionGBIF <- function(dat, First_step, Buffer_km, GBIF_crop, Gbif_
   }
 
   if (First_step == "indivsites") {
-    distGBIF <- st_buffer(dat, 1)
+    distGBIF <- st_buffer(dat_proj, 1)
   }
 
   distGBIF <- st_buffer(distGBIF, Buffer_km * 1000) %>% st_as_sf()
-  distGBIF <- st_transform(distGBIF, orig_crs)
   return(distGBIF)
 }
 
