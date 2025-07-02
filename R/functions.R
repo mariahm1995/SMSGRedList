@@ -6,7 +6,7 @@
 #' @return A character vector of country names that intersect the input map.
 #' @export
 countries_intersection <- function(map){
-  countries_pol <- st_read("data/geodata/sRedList/Red_List_countries_msSimplif0.05_MOLL.shp") %>% st_make_valid()
+  countries_pol <- st_read("data/geodata/polygons/Countries/") %>% st_make_valid()
   map <- st_make_valid(map)
   overlap_countries <- st_intersection(countries_pol, map)
   countries_list <- overlap_countries$ADM0_NAME
