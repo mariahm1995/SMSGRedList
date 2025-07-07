@@ -165,9 +165,9 @@ checkMap <- function(map, method, smoothness = NULL, smooth, elevation_range,
   elevation <- raster::raster("data/geodata/rasters/DEM_globe_raster/dem_globe1.tif")
   land_full <- st_read("data/geodata/sRedList/Red_List_countries_msSimplif0.05_MOLL.shp") %>% st_make_valid()
 
-  if (continental == TRUE){
-    land_full <- land_full %>% slice(1:7)
-  }
+  # if (continental == TRUE){
+  #   land_full <- land_full %>% slice(1:7)
+  # }
 
   # sf::sf_use_s2(FALSE)
 
@@ -176,8 +176,10 @@ checkMap <- function(map, method, smoothness = NULL, smooth, elevation_range,
   }
 
   land_proj <- st_transform(land_full, st_crs(map))
-  land <- st_crop(land_proj, st_bbox(map) + c(-200000, -200000, 200000, 200000)) %>%
-    st_union()
+  land_proj <- st_make_valid(land_proj)
+
+  land <- st_crop(land_proj, st_bbox(map) + c(-200000, -200000, 200000, 200000))
+  land <- st_union(land)
   land <- st_transform(land, 4326)
 
   # sf::sf_use_s2(TRUE)
@@ -202,12 +204,15 @@ checkMap <- function(map, method, smoothness = NULL, smooth, elevation_range,
            -Inf, AltMIN, NA)
     rclmat <- matrix(m, ncol = 3, byrow = TRUE)
 
-    elevation_crop <- crop(elevation, st_bbox(map))
+    map_wgs <- st_transform(map, crs = raster::crs(elevation))
+    elevation_crop <- crop(elevation, st_bbox(map_wgs))
+
+
     raster_masked <- terra::classify(terra::rast(elevation_crop), rclmat)
     raster_polygons <- terra::as.polygons(raster_masked, na.rm = TRUE)
     raster_polygons_sf <- st_as_sf(raster_polygons)
 
-    polygon_intersect <- st_intersection(map, raster_polygons_sf)
+    polygon_intersect <- st_intersection(map_wgs, raster_polygons_sf)
     simplified_polygon <- st_union(polygon_intersect)
 
     oversimplified <- rmapshaper::ms_simplify(simplified_polygon, keep = keep,
