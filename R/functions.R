@@ -587,6 +587,9 @@ sRL_LeafletFlags <- function(flags, previous_map, final_map, elevation_map,
                 color = "#E84A5F") %>%
     addPolygons(data = as_Spatial(final_map), fillColor = "transparent",
                 color = "black") %>%
+    { if (!is.null(elevation_map))
+      addPolygons(., data = as_Spatial(elevation_map), fillColor = "transparent", color = "#34a0a4")
+      else . } %>%
     addCircleMarkers(
       lng = flags$decimalLongitude,
       lat = flags$decimalLatitude,

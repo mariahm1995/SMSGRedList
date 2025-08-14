@@ -146,7 +146,7 @@ processed_maps <- checkMap(
 # Manual editing (if needed)
 # ========================
 new_area <- manualEdition(
-  modification_type = "add",
+  modification_type = "keep_as_drawn",
   maps = processed_maps,
   previous_map = previous_map,
   occs = occs_filter_spatial
