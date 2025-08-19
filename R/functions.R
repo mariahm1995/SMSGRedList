@@ -620,3 +620,102 @@ sRL_LeafletFlags <- function(flags, previous_map, final_map, elevation_map,
   return(Leaf)
 }
 
+
+#' Export a spatial object for IUCN Red List submission (no previous map)
+#'
+#' @param new_map    `sf` or `sfc` geometry to export.
+#' @param spname     Character. Species name used for output folder/file.
+#' @param currentyear Integer. Assessment year (fills `yrcompiled`).
+#' @param id_no      Integer or character. IUCN id_no.
+#' @param presence   Integer. IUCN presence code.
+#' @param origin     Integer. IUCN origin code.
+#' @param seasonal   Integer. IUCN seasonal code.
+#' @param compiler   Character. Name(s) of compiler(s).
+#' @param citation   Character. Citation string.
+#' @param subspecies Character. Subspecies text (optional).
+#' @param subpop     Character. Subpopulation text (optional).
+#' @param data_sens  Integer/character. Data sensitivity flag (optional).
+#' @param sens_comm  Character. Sensitivity comments (optional).
+#' @param source     Character. Data source (optional).
+#' @param dist_comm  Character. Distribution comments (optional).
+#' @param island     Character/integer. Island flag/field (optional).
+#' @param tax_comm   Character. Taxonomic comments (optional).
+#' @param generalisd Integer/character. Generalised flag (optional).
+#' @param template_path Path to template layer (folder with .shp or a .gpkg/.shp). Defaults to "data/geodata/empty_polygon/".
+#' @return Invisibly returns the final `sf` written to disk.
+#' @export
+exportSpatialobjectNew <- function(
+    new_map,
+    spname,
+    currentyear,
+    id_no,
+    presence = 1,
+    origin = 1,
+    seasonal = 1,
+    compiler,
+    citation = "IUCN SSC Small Mammal Specialist Group",
+    subspecies = NA,
+    subpop     = NA,
+    data_sens  = NA,
+    sens_comm  = NA,
+    source_name  = NA,
+    dist_comm  = NA,
+    island     = NA,
+    tax_comm   = NA,
+    generalisd = NA
+){
+  sf::sf_use_s2(FALSE)
+  on.exit(sf::sf_use_s2(TRUE))
+  template <- st_read("data/geodata/empty_polygon/") %>% st_make_valid()
+  final_map <- template
+  final_map <- plyr::rbind.fill(final_map, data.frame(OBJECTID = NA))
+
+  empty_matrix <- as.data.frame(matrix(data = NA, nrow = length(new_map)-1, ncol = ncol(final_map)))
+  colnames(empty_matrix) <- colnames(final_map)
+  final_map <- rbind(final_map, empty_matrix)
+
+  final_map$OBJECTID <- seq(1, nrow(final_map), 1)
+  for (i in seq_along(new_map)) {
+    final_map$geometry[i] <- new_map[i]
+  }
+
+  final_map$sci_name <- spname
+  final_map$presence   <- presence
+  final_map$origin     <- as.integer(origin)
+  final_map$seasonal   <- as.integer(seasonal)
+  final_map$compiler   <- compiler
+  final_map$yrcompiled <- as.integer(currentyear)
+  final_map$citation   <- citation
+  final_map$subspecies <- subspecies
+  final_map$subpop     <- subpop
+  final_map$data_sens  <- data_sens
+  final_map$sens_comm  <- sens_comm
+  final_map$source     <- source_name
+  final_map$dist_comm  <- dist_comm
+  final_map$island     <- island
+  final_map$tax_comm   <- tax_comm
+  final_map$generalisd <- generalisd
+  final_map$id_no      <- id_no
+
+  # Geometry metrics
+  # Area in km^2 (st_area returns m^2 for projected/geodesic)
+  shape_areas <- round(as.numeric(st_area(final_map$geometry))/1000, 0)
+  final_map$Shape_Area <- ifelse(any(shape_areas > 1000000), NA, shape_areas)
+
+  # Drop columns that are entirely NA (keep geometry)
+  keep <- vapply(final_map, function(x) any(!is.na(x)), logical(1))
+  keep[attr(final_map, "sf_column")] <- TRUE
+  final_map <- final_map[, keep]
+
+  # Ensure sf class
+  final_map <- sf::st_as_sf(final_map)
+
+  # Write out
+  dir_path <- paste0("species/", spname, "/", spname, "_final_map")
+  if (!dir.exists(dir_path)) { dir.create(dir_path, recursive = TRUE)
+    message("The folder has been created.") } else
+      { message("The folder already exists.") }
+  st_write(final_map, paste0(dir_path, "/", spname, "_final_map.shp"), append = FALSE)
+
+  return(final_map)
+}
