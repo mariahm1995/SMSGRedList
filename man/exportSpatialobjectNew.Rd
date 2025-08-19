@@ -6,7 +6,6 @@
 \usage{
 exportSpatialobjectNew(
   new_map,
-  spname,
   currentyear,
   id_no,
   presence = 1,
@@ -27,8 +26,6 @@ exportSpatialobjectNew(
 }
 \arguments{
 \item{new_map}{\code{sf} or \code{sfc} geometry to export.}
-
-\item{spname}{Character. Species name used for output folder/file.}
 
 \item{currentyear}{Integer. Assessment year (fills \code{yrcompiled}).}
 
@@ -59,6 +56,8 @@ exportSpatialobjectNew(
 \item{tax_comm}{Character. Taxonomic comments (optional).}
 
 \item{generalisd}{Integer/character. Generalised flag (optional).}
+
+\item{spname}{Character. Species name used for output folder/file.}
 
 \item{source}{Character. Data source (optional).}
 

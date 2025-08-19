@@ -673,7 +673,6 @@ sRL_LeafletFlags <- function(flags, previous_map, final_map, elevation_map,
 #' @export
 exportSpatialobjectNew <- function(
     new_map,
-    spname,
     currentyear,
     id_no,
     presence = 1,
@@ -706,7 +705,7 @@ exportSpatialobjectNew <- function(
     final_map$geometry[i] <- new_map[i]
   }
 
-  final_map$sci_name <- spname
+  final_map$sci_name <- scientific_name
   final_map$presence   <- presence
   final_map$origin     <- as.integer(origin)
   final_map$seasonal   <- as.integer(seasonal)
