@@ -88,8 +88,17 @@ combineOccs <- function(occsGBIF = NULL, occsLit = NULL, combine = TRUE) {
 #' @export
 extractElevation <- function(occs){
   raster <- raster::raster("data/geodata/rasters/DEM_globe_raster/dem_globe1.tif")
+  CRSMOLL <- "GEOGCRS[\"WGS 84\",\n    DATUM[\"World Geodetic System 1984\",\n
+  ELLIPSOID[\"WGS 84\",6378137,298.257223563,\n
+  LENGTHUNIT[\"metre\",1]]],\n    PRIMEM[\"Greenwich\",0,\n
+  ANGLEUNIT[\"degree\",0.0174532925199433]],\n    CS[ellipsoidal,2],\n
+  AXIS[\"geodetic latitude (Lat)\",north,\n            ORDER[1],\n
+  ANGLEUNIT[\"degree\",0.0174532925199433]],\n
+  AXIS[\"geodetic longitude (Lon)\",east,\n
+  ORDER[2],\n            ANGLEUNIT[\"degree\",0.0174532925199433]],\n
+  ID[\"EPSG\",4326]]"
   occsSpatial <- st_as_sf(occs[c("decimalLongitude", "decimalLatitude")],
-                          coords = c("decimalLongitude", "decimalLatitude"), crs = crs(previous_map))
+                          coords = c("decimalLongitude", "decimalLatitude"), crs = CRSMOLL)
   occs$elevationCalculated <- terra::extract(raster, occsSpatial)
   return(occs)
 }
@@ -163,39 +172,49 @@ checkMap <- function(map, method, smoothness = NULL, smooth, elevation_range,
                      AltMIN, AltMAX, keep = .05, continental) {
 
   elevation <- raster::raster("data/geodata/rasters/DEM_globe_raster/dem_globe1.tif")
-  land_full <- st_read("data/geodata/sRedList/Red_List_countries_msSimplif0.05_MOLL.shp") %>% st_make_valid()
-
-  # if (continental == TRUE){
-  #   land_full <- land_full %>% slice(1:7)
-  # }
-
-  # sf::sf_use_s2(FALSE)
+  land_full <- st_read("data/geodata/sRedList/Red_List_countries_msSimplif0.05_MOLL.shp") %>%
+  st_set_crs("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs") %>%
+    st_make_valid()
 
   if (is.na(st_crs(map))) {
-    st_crs(map) <- st_crs("ESRI:54009")   # or use the +proj string as above
+    CRSMOLL <- "GEOGCRS[\"WGS 84\",\n    DATUM[\"World Geodetic System 1984\",\n
+  ELLIPSOID[\"WGS 84\",6378137,298.257223563,\n
+  LENGTHUNIT[\"metre\",1]]],\n    PRIMEM[\"Greenwich\",0,\n
+  ANGLEUNIT[\"degree\",0.0174532925199433]],\n    CS[ellipsoidal,2],\n
+  AXIS[\"geodetic latitude (Lat)\",north,\n            ORDER[1],\n
+  ANGLEUNIT[\"degree\",0.0174532925199433]],\n
+  AXIS[\"geodetic longitude (Lon)\",east,\n
+  ORDER[2],\n            ANGLEUNIT[\"degree\",0.0174532925199433]],\n
+  ID[\"EPSG\",4326]]"
+    st_crs(map) <- CRSMOLL   # or use the +proj string as above
   }
+  crs_proj <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
+  map_proj  <- st_transform(map, crs_proj)
+  land_proj <- st_transform(land_full, crs_proj)
 
-  land_proj <- st_transform(land_full, st_crs(map))
-  land_proj <- st_make_valid(land_proj)
+  bb_poly <- st_as_sfc(st_bbox(map_proj))
+  bb_buf  <- st_buffer(bb_poly, 200000)  # 200 km buffer in meters
 
-  land <- st_crop(land_proj, st_bbox(map) + c(-200000, -200000, 200000, 200000))
-  land <- st_union(land)
-  land <- st_transform(land, 4326)
+  land <- st_crop(land_proj, bb_buf) %>% st_make_valid() %>% st_union()
+
+  # Only convert to WGS84 if you truly need lat/long next
+  land_wgs <- st_transform(land, 4326)
+  map_wgs  <- st_transform(map_proj, 4326)
 
   # sf::sf_use_s2(TRUE)
 
   if (smooth == TRUE) {
     if (method == "ksmooth") {
-      map_smoothed <- smoothr::smooth(map, method = method, smoothness = smoothness)
-      new <- st_intersection(st_as_sf(map) %>% st_transform(4326), land)
+      map_smoothed <- smoothr::smooth(map_wgs, method = method, smoothness = smoothness)
+      new <- st_intersection(st_as_sf(map_smoothed) %>% st_transform(4326), land_wgs)
     }
     if (method %in% c("chaikin", "spline")) {
-      map_smoothed <- smoothr::smooth(map, method = method, smoothness = smoothness)
+      map_smoothed <- smoothr::smooth(map_wgs, method = method, smoothness = smoothness)
       map_smoothed_sf <- st_as_sf(map_smoothed) %>% st_transform(4326)
-      new <- st_intersection(map_smoothed_sf, land)
+      new <- st_intersection(map_smoothed_sf, land_wgs)
     }
   } else {
-    new <- st_intersection(st_as_sf(map) %>% st_transform(4326), land)
+    new <- st_intersection(st_as_sf(map_wgs) %>% st_transform(4326), land_wgs)
   }
 
   if (elevation_range == TRUE){
@@ -494,7 +513,15 @@ sRL_MapDistributionGBIF <- function(dat, First_step, Buffer_km, GBIF_crop, Gbif_
   # distCountries_mapping <- st_read("data/geodata/sRedList/Red_List_countries_msSimplif0.05_MOLL.shp")
   distCountries_mapping <- st_read("data/geodata/sRedList/Red_List_countries_msSimplif0.05_MOLL.shp") %>% st_make_valid()
   realms_raw <- st_read("data/geodata/sRedList/RL_Realms.shp")
-  CRSMOLL <- "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
+  CRSMOLL <- "GEOGCRS[\"WGS 84\",\n    DATUM[\"World Geodetic System 1984\",\n
+  ELLIPSOID[\"WGS 84\",6378137,298.257223563,\n
+  LENGTHUNIT[\"metre\",1]]],\n    PRIMEM[\"Greenwich\",0,\n
+  ANGLEUNIT[\"degree\",0.0174532925199433]],\n    CS[ellipsoidal,2],\n
+  AXIS[\"geodetic latitude (Lat)\",north,\n            ORDER[1],\n
+  ANGLEUNIT[\"degree\",0.0174532925199433]],\n
+  AXIS[\"geodetic longitude (Lon)\",east,\n
+  ORDER[2],\n            ANGLEUNIT[\"degree\",0.0174532925199433]],\n
+  ID[\"EPSG\",4326]]"
   realms_mcp <- st_union(realms_raw) %>% st_as_sf() %>% st_transform(CRSMOLL) %>% st_convex_hull() %>% st_buffer(1000)
 
   # -------------------------------------------------------------------
